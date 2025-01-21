@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';  // Ajout de WebSocket
 import { MongoClient } from 'mongodb';
 
 const WS_PORT = 8080;
@@ -28,7 +28,7 @@ function validateMessage(data) {
   }
 }
 
-async function handleMessage(ws, data, db) {
+async function handleMessage(ws, data, db, wss) {
   try {
     const message = validateMessage(data);
     
@@ -38,14 +38,18 @@ async function handleMessage(ws, data, db) {
       content: message
     });
 
-    // Echo back the message
-    ws.send(JSON.stringify({
-      type: 'ECHO',
-      content: message,
-      timestamp: new Date()
-    }));
+    // Echo back the message to all clients
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'ECHO',
+          content: message,
+          timestamp: new Date()
+        }));
+      }
+    });
 
-    console.log('Message received:', message);
+    console.log('Message :', message);
   } catch (error) {
     ws.send(JSON.stringify({
       type: 'ERROR',
@@ -66,7 +70,7 @@ async function startServer() {
     });
 
     ws.on('message', async (data) => {
-      await handleMessage(ws, data, db);
+      await handleMessage(ws, data, db, wss);
     });
 
     ws.on('close', () => {
